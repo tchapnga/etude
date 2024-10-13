@@ -1,0 +1,67 @@
+@startuml
+skinparam shadowing false
+skinparam monochrome false
+skinparam ArrowColor #555555
+skinparam BackgroundColor #F9F9F9
+skinparam FontName Arial
+skinparam FontSize 15
+
+skinparam rectangle {
+  BackgroundColor #F7F7F7
+  BorderColor #CCCCCC
+}
+skinparam package {
+  BackgroundColor #EFEFEF
+  BorderColor #BBBBBB
+}
+
+actor Clientele as clientele
+actor Conseil as conseil
+
+cloud "Genesys Cloud CX" as genesys #FFCCCC
+
+package "Poste banque" {
+  rectangle "Genesys Cloud CX Agent Workspace (Interface web)" as agent_workspace #FFE5CC
+  component "Ether" as ether #E0F7FF
+}
+
+package "CRM" {
+  component "BVD - Vision Client 360 (CRM)" as vision_client #CCE5FF
+  component "Microsoft Dynamics" as dynamics #CCCCFF
+  component "BBO - Backend conversation" as backend_conversation #FFE5CC
+}
+
+package "Backend" {
+  component "KBT/KBS - Chatbot" as chatbot #FFEEEE
+  component "YX7 - Prise de rendez-vous" as rendezvous #FFEEEE
+  component "X1J - Spitch" as spitch #FFDADA
+  component "YB1 - Recherche Tiers" as recherche_tiers #FFDADA
+}
+
+' Interactions clients et agents
+clientele --> genesys : Appel/ Email
+clientele --> chatbot : Chat
+conseil --> agent_workspace : Utilisation interface web
+
+' Interactions Agent Workspace et Genesys
+agent_workspace --> genesys : Gestion des interactions
+genesys --> agent_workspace : Affiche données client (via Dynamics)
+
+' WebSocket communication
+genesys --> ether : WebSocket - Envoi d'informations
+ether --> vision_client : Mise à jour Vision Client 360 (BVD)
+
+' Gestion des rendez-vous et callbacks
+chatbot --> rendezvous : Demande callback
+rendezvous --> genesys : Réservation callback
+
+' Recherche et identification
+genesys --> recherche_tiers : Recherche tiers
+genesys --> spitch : Débranchement VoiceBot
+spitch --> backend_conversation : Identification\n appelant
+
+' Connexion avec CRM et Backend
+genesys --> dynamics : Accès au CRM complet
+vision_client --> backend_conversation : Compte rendu client
+
+@enduml

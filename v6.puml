@@ -1,0 +1,61 @@
+@startuml
+skinparam shadowing false
+skinparam monochrome false
+skinparam ArrowColor #333333
+skinparam BackgroundColor #F9F9F9
+skinparam FontName Arial
+skinparam FontSize 12
+
+skinparam rectangle {
+  BackgroundColor #F7F7F7
+  BorderColor #CCCCCC
+}
+skinparam package {
+  BackgroundColor #EFEFEF
+  BorderColor #BBBBBB
+}
+
+actor Clientele as clientele
+actor Conseil as conseil
+
+package "Poste banque (local)" {
+  rectangle "Microsoft Dynamics Call Center CX Agent Workspace (Interface web)" as agent_workspace #FFE5CC
+  component "Ether (via WebSocket)" as ether #E0F7FF
+  component "Microsoft Dynamics CRM" as dynamics_crm #CCCCFF
+}
+
+component "KBT/KBS - Chatbot" as chatbot #FFEEEE
+component "YX7 - Prise de rendez-vous" as rendezvous #FFEEEE
+component "Microsoft Dynamics Call Center" as dynamics_call_center #FFCCCC
+component "X1J - Spitch" as spitch #FFDADA
+component "YB1 - Recherche Tiers" as recherche_tiers #FFDADA
+component "BBO - Backend conversation" as backend_conversation #FFE5CC
+component "BVD - Vision Client 360" as vision_client #CCE5FF
+
+'---- Interactions principales ----
+conseil --> agent_workspace :  Réception d’un appel
+clientele --> dynamics_call_center : Appel entrant
+conseil --> dynamics_call_center : Appel sortant
+clientele --> chatbot : Interaction via chat
+
+'---- Gestion des rendez-vous ----
+chatbot --> rendezvous : Demande de callback
+rendezvous --> dynamics_call_center : Réservation de callback
+
+'---- Recherche et identification ----
+dynamics_call_center --> recherche_tiers : Recherche de tiers
+dynamics_call_center --> spitch : Débranchement VoiceBot
+
+'---- Connexion avec Microsoft Dynamics CRM ----
+agent_workspace --> dynamics_crm : Accès aux données CRM
+dynamics_call_center --> dynamics_crm : Mise à jour des informations CRM
+
+'---- Communication via WebSocket ----
+agent_workspace --> ether : Envoi d'informations via WebSocket
+ether --> vision_client : Mise à jour Vision Client 360
+
+'---- Gestion backend ----
+spitch --> backend_conversation : Identification de l'appelant
+vision_client --> backend_conversation : Compte rendu client
+
+@enduml

@@ -1,0 +1,54 @@
+
+Voici une estimation du projet en jours-hommes (JH) pour chaque étape du déploiement de Microsoft Dynamics Call Center avec les différentes intégrations (Ether, YB1, Spitch, Chatbot, YX7, Dynamics CRM) :
+
+1. Licences Microsoft Dynamics 365 Call Center (Cloud)
+Aucune estimation en jour-homme n’est nécessaire pour l’achat et la mise en place des licences, car il s'agit principalement d'un coût lié à l'abonnement.
+
+2. Développement des intégrations personnalisées
+Voici les estimations de jours-hommes pour le développement et la mise en place des différentes intégrations :
+
+Ether (via WebSocket) :
+
+Estimation : 20 jours-hommes (développement et intégration)
+YB1 (via REST API) :
+
+Estimation : 15 jours-hommes (développement et intégration)
+Spitch (VoiceBot) :
+
+Estimation : 10 jours-hommes (développement et intégration)
+Chatbot (KBT/KBS) :
+
+Estimation : 10 jours-hommes (développement et intégration)
+YX7 (Prise de rendez-vous) :
+
+Estimation : 10 jours-hommes (développement et intégration)
+Microsoft Dynamics CRM (synchronisation des données) :
+
+Estimation : 10 jours-hommes (développement et intégration)
+3. Tests et validations
+Les tests et validations incluent les tests d'intégration, de performance et de sécurité pour chaque point d'intégration.
+
+Tests d'intégration (Ether, YB1, Spitch, Chatbot, YX7) :
+
+Estimation : 15 jours-hommes (QA team)
+Tests de performance et sécurité :
+
+Estimation : 10 jours-hommes (QA team)
+4. Marge pour les inconnus techniques
+Une marge de 20 % est ajoutée aux estimations de développement pour couvrir les aléas techniques, ce qui équivaut à :
+
+Marge d’inconnu (20 %) :
+Estimation : 17 jours-hommes (20 % du total du développement)
+Total des jours-hommes pour le projet :
+Élément	Estimation (Jours-Hommes)
+Intégration Ether (WebSocket)	20 JH
+Intégration YB1 (REST API)	15 JH
+Intégration Spitch (VoiceBot)	10 JH
+Intégration Chatbot (KBT/KBS)	10 JH
+Intégration YX7 (Prise de rendez-vous)	10 JH
+Intégration Microsoft Dynamics CRM	10 JH
+Tests et validation	25 JH (15 JH pour intégration + 10 JH pour performance)
+Marge pour les inconnus techniques (20 %)	17 JH
+Total estimé	117 Jours-Hommes
+Conclusion :
+Le total estimé pour ce projet en termes de jours-hommes est de 117 JH. Cela couvre les intégrations de tous les systèmes (Ether, YB1, Spitch, Chatbot, YX7, Microsoft Dynamics CRM), les tests, ainsi qu'une marge pour les imprévus techniques.
