@@ -1,0 +1,268 @@
+# Configuration de la base de données SQL Server
+spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=votre_base_de_donnees
+spring.datasource.username=yourusername
+spring.datasource.password=yourpassword
+spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+# Configuration Hibernate
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Répertoires pour les fichiers PDF et le rapport
+pdf.storage.directory=./pdf-storage
+excel.report.directory=./reports
+
+
+<dependencies>
+    <!-- Spring Boot Web Starter -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Spring Boot Data JPA Starter (pour l'interaction avec la base de données) -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+
+    <!-- Microsoft SQL Server JDBC Driver -->
+    <dependency>
+        <groupId>com.microsoft.sqlserver</groupId>
+        <artifactId>mssql-jdbc</artifactId>
+        <version>10.2.1.jre17</version> <!-- Assurez-vous de correspondre à votre version de Java -->
+    </dependency>
+
+    <!-- Apache POI (pour la génération du fichier Excel) -->
+    <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml</artifactId>
+        <version>5.2.3</version> <!-- Dernière version au moment de cette réponse -->
+    </dependency>
+
+    <!-- iText PDF (pour la génération des fichiers PDF) -->
+    <dependency>
+        <groupId>com.itextpdf</groupId>
+        <artifactId>itext7-core</artifactId>
+        <version>7.2.5</version> <!-- Assurez-vous d'utiliser une version compatible -->
+    </dependency>
+
+    <!-- JAXB API pour le décodage hexadécimal (nécessaire pour certaines versions de Java 11+) -->
+    <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>2.3.1</version>
+    </dependency>
+
+    <!-- Spring Boot Starter Test (pour les tests, facultatif) -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+
+
+<dependency>
+    <groupId>com.microsoft.sqlserver</groupId>
+    <artifactId>mssql-jdbc</artifactId>
+    <version>10.2.1.jre17</version>
+</dependency>
+
+
+package com.example.pdfprocessor.model;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Column;
+
+@Entity
+@Table(name = "PDF")
+public class PDFEntity {
+
+    @Id
+    @Column(name = "ID", nullable = true, length = 50)
+    private String id;
+
+    @Column(name = "ZEK_PDF", nullable = true, length = 50)
+    private String zekPdf;
+
+    @Column(name = "Formulaires_PDF", nullable = true, length = 50)
+    private String formulairesPdf;
+
+    @Column(name = "Rapport_decision_PDF", nullable = true, length = 50)
+    private String rapportDecisionPdf;
+
+    // Getters et Setters
+}
+
+
+
+
+package com.example.pdfprocessor.repository;
+
+import com.example.pdfprocessor.model.PDFEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface PDFRepository extends JpaRepository<PDFEntity, String> {
+}
+
+
+
+
+package com.example.pdfprocessor.service;
+
+import com.example.pdfprocessor.model.PDFEntity;
+import com.example.pdfprocessor.repository.PDFRepository;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.xml.bind.DatatypeConverter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.nio.file.Paths;
+import java.util.List;
+
+@Service
+public class PDFService {
+
+    private final PDFRepository pdfRepository;
+    @Value("${pdf.storage.directory}")
+    private String pdfStorageDirectory;
+    @Value("${excel.report.directory}")
+    private String excelReportDirectory;
+
+    public PDFService(PDFRepository pdfRepository) {
+        this.pdfRepository = pdfRepository;
+    }
+
+    public void processPDFs() throws Exception {
+        List<PDFEntity> pdfEntities = pdfRepository.findAll();
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Rapport de traitement");
+
+        int rowCount = 0;
+        Row headerRow = sheet.createRow(rowCount++);
+        headerRow.createCell(0).setCellValue("ID");
+        headerRow.createCell(1).setCellValue("ZEK_PDF");
+        headerRow.createCell(2).setCellValue("Formulaires_PDF");
+        headerRow.createCell(3).setCellValue("Rapport_decision_PDF");
+
+        for (PDFEntity entity : pdfEntities) {
+            Row row = sheet.createRow(rowCount++);
+            row.createCell(0).setCellValue(entity.getId());
+            row.createCell(1).setCellValue(savePdf(entity.getId(), entity.getZekPdf(), "ZEK"));
+            row.createCell(2).setCellValue(savePdf(entity.getId(), entity.getFormulairesPdf(), "Formulaires_PDF"));
+            row.createCell(3).setCellValue(savePdf(entity.getId(), entity.getRapportDecisionPdf(), "Rapport_decision"));
+        }
+
+        File reportDir = new File(excelReportDirectory);
+        if (!reportDir.exists()) reportDir.mkdirs();
+        try (OutputStream fileOut = new FileOutputStream(Paths.get(excelReportDirectory, "Rapport_de_traitement.xlsx").toString())) {
+            workbook.write(fileOut);
+        }
+    }
+
+    private String savePdf(String id, String hexData, String directoryName) {
+        if (hexData == null || hexData.isEmpty()) {
+            return "KO";
+        }
+        try {
+            byte[] pdfData = DatatypeConverter.parseHexBinary(hexData);
+            File dir = new File(pdfStorageDirectory, directoryName);
+            if (!dir.exists()) dir.mkdirs();
+
+            try (FileOutputStream fos = new FileOutputStream(new File(dir, id + ".pdf"))) {
+                fos.write(pdfData);
+            }
+            return "OK";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "KO";
+        }
+    }
+}
+
+
+
+
+package com.example.pdfprocessor.controller;
+
+import com.example.pdfprocessor.service.PDFService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class PDFController {
+
+    private final PDFService pdfService;
+
+    @Autowired
+    public PDFController(PDFService pdfService) {
+        this.pdfService = pdfService;
+    }
+
+    @GetMapping("/process-pdfs")
+    public String processPdfs() {
+        try {
+            pdfService.processPDFs();
+            return "Traitement terminé. Rapport généré dans le répertoire de rapports.";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Erreur lors du traitement des PDFs.";
+        }
+    }
+}
+
+
+package com.example.pdfprocessor;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class PdfProcessorApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(PdfProcessorApplication.class, args);
+    }
+}
+
+
+
+public byte[] decodeHex(String hexData) {
+    if (hexData == null || hexData.isEmpty()) {
+        throw new IllegalArgumentException("La chaîne hexadécimale est vide ou nulle.");
+    }
+
+    // Retirer le préfixe 0x s'il est présent
+    if (hexData.startsWith("0x")) {
+        hexData = hexData.substring(2);
+    }
+
+    // Vérifier la longueur pour s'assurer qu'elle est paire
+    if (hexData.length() % 2 != 0) {
+        throw new IllegalArgumentException("La longueur de la chaîne hexadécimale est impaire et donc invalide : " + hexData);
+    }
+
+    // Décoder la chaîne hexadécimale en tableau d'octets
+    return DatatypeConverter.parseHexBinary(hexData);
+}
+
+Étape 3 : Déterminer si la Chaîne est UTF-8 ou un autre Format de Texte
+Si la chaîne contient des caractères ASCII au lieu de valeurs binaires, elle pourrait être du texte en UTF-8 ou un autre encodage de texte.
+
+Essayer de Convertir en Texte UTF-8 :
+
+public String convertToUtf8(String data) {
+    byte[] bytes = data.getBytes(StandardCharsets.UTF_8);
+    return new String(bytes, StandardCharsets.UTF_8);
+}
+
+
