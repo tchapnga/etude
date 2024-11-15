@@ -1,202 +1,13 @@
-# Configuration de la base de données SQL Server
-spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=votre_base_de_donnees
-spring.datasource.username=yourusername
-spring.datasource.password=yourpassword
-spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
-
-# Configuration Hibernate
-spring.jpa.hibernate.ddl-auto=none
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-
-# Répertoires pour les fichiers PDF et le rapport
-pdf.storage.directory=./pdf-storage
-excel.report.directory=./reports
-
-
-<dependencies>
-    <!-- Spring Boot Web Starter -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-
-    <!-- Spring Boot Data JPA Starter (pour l'interaction avec la base de données) -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-
-    <!-- Microsoft SQL Server JDBC Driver -->
-    <dependency>
-        <groupId>com.microsoft.sqlserver</groupId>
-        <artifactId>mssql-jdbc</artifactId>
-        <version>10.2.1.jre17</version> <!-- Assurez-vous de correspondre à votre version de Java -->
-    </dependency>
-
-    <!-- Apache POI (pour la génération du fichier Excel) -->
-    <dependency>
-        <groupId>org.apache.poi</groupId>
-        <artifactId>poi-ooxml</artifactId>
-        <version>5.2.3</version> <!-- Dernière version au moment de cette réponse -->
-    </dependency>
-
-    <!-- iText PDF (pour la génération des fichiers PDF) -->
-    <dependency>
-        <groupId>com.itextpdf</groupId>
-        <artifactId>itext7-core</artifactId>
-        <version>7.2.5</version> <!-- Assurez-vous d'utiliser une version compatible -->
-    </dependency>
-
-    <!-- JAXB API pour le décodage hexadécimal (nécessaire pour certaines versions de Java 11+) -->
-    <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
-        <version>2.3.1</version>
-    </dependency>
-
-    <!-- Spring Boot Starter Test (pour les tests, facultatif) -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-test</artifactId>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
-
-
-<dependency>
-    <groupId>com.microsoft.sqlserver</groupId>
-    <artifactId>mssql-jdbc</artifactId>
-    <version>10.2.1.jre17</version>
-</dependency>
-
-
-package com.example.pdfprocessor.model;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Column;
-
-@Entity
-@Table(name = "PDF")
-public class PDFEntity {
-
-    @Id
-    @Column(name = "ID", nullable = true, length = 50)
-    private String id;
-
-    @Column(name = "ZEK_PDF", nullable = true, length = 50)
-    private String zekPdf;
-
-    @Column(name = "Formulaires_PDF", nullable = true, length = 50)
-    private String formulairesPdf;
-
-    @Column(name = "Rapport_decision_PDF", nullable = true, length = 50)
-    private String rapportDecisionPdf;
-
-    // Getters et Setters
+public interface PDFProjection {
+    String getId();
+    String getZekPdf();
+    String getFormulairesPdf();
+    String getRapportDecisionPdf();
 }
 
 
-
-
-package com.example.pdfprocessor.repository;
-
-import com.example.pdfprocessor.model.PDFEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface PDFRepository extends JpaRepository<PDFEntity, String> {
-}
-
-
-
-
-package com.example.pdfprocessor.service;
-
-import com.example.pdfprocessor.model.PDFEntity;
-import com.example.pdfprocessor.repository.PDFRepository;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import javax.xml.bind.DatatypeConverter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.nio.file.Paths;
-import java.util.List;
-
-@Service
-public class PDFService {
-
-    private final PDFRepository pdfRepository;
-    @Value("${pdf.storage.directory}")
-    private String pdfStorageDirectory;
-    @Value("${excel.report.directory}")
-    private String excelReportDirectory;
-
-    public PDFService(PDFRepository pdfRepository) {
-        this.pdfRepository = pdfRepository;
-    }
-
-    public void processPDFs() throws Exception {
-        List<PDFEntity> pdfEntities = pdfRepository.findAll();
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Rapport de traitement");
-
-        int rowCount = 0;
-        Row headerRow = sheet.createRow(rowCount++);
-        headerRow.createCell(0).setCellValue("ID");
-        headerRow.createCell(1).setCellValue("ZEK_PDF");
-        headerRow.createCell(2).setCellValue("Formulaires_PDF");
-        headerRow.createCell(3).setCellValue("Rapport_decision_PDF");
-
-        for (PDFEntity entity : pdfEntities) {
-            Row row = sheet.createRow(rowCount++);
-            row.createCell(0).setCellValue(entity.getId());
-            row.createCell(1).setCellValue(savePdf(entity.getId(), entity.getZekPdf(), "ZEK"));
-            row.createCell(2).setCellValue(savePdf(entity.getId(), entity.getFormulairesPdf(), "Formulaires_PDF"));
-            row.createCell(3).setCellValue(savePdf(entity.getId(), entity.getRapportDecisionPdf(), "Rapport_decision"));
-        }
-
-        File reportDir = new File(excelReportDirectory);
-        if (!reportDir.exists()) reportDir.mkdirs();
-        try (OutputStream fileOut = new FileOutputStream(Paths.get(excelReportDirectory, "Rapport_de_traitement.xlsx").toString())) {
-            workbook.write(fileOut);
-        }
-    }
-
-    private String savePdf(String id, String hexData, String directoryName) {
-        if (hexData == null || hexData.isEmpty()) {
-            return "KO";
-        }
-        try {
-            byte[] pdfData = DatatypeConverter.parseHexBinary(hexData);
-            File dir = new File(pdfStorageDirectory, directoryName);
-            if (!dir.exists()) dir.mkdirs();
-
-            try (FileOutputStream fos = new FileOutputStream(new File(dir, id + ".pdf"))) {
-                fos.write(pdfData);
-            }
-            return "OK";
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "KO";
-        }
-    }
-}
-
-
-
-
-package com.example.pdfprocessor.controller;
-
-import com.example.pdfprocessor.service.PDFService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+@Query("SELECT p.id AS id, p.zekPdf AS zekPdf, p.formulairesPdf AS formulairesPdf, p.rapportDecisionPdf AS rapportDecisionPdf FROM PDFEntity p")
+Stream<PDFProjection> streamAll();
 
 @RestController
 public class PDFController {
@@ -212,7 +23,7 @@ public class PDFController {
     public String processPdfs() {
         try {
             pdfService.processPDFs();
-            return "Traitement terminé. Rapport généré dans le répertoire de rapports.";
+            return "Traitement terminé avec succès. Rapport disponible.";
         } catch (Exception e) {
             e.printStackTrace();
             return "Erreur lors du traitement des PDFs.";
@@ -220,49 +31,186 @@ public class PDFController {
     }
 }
 
+@Service
+public class PDFService {
 
-package com.example.pdfprocessor;
+    private final PDFRepository pdfRepository;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+    @Value("${pdf.storage.directory}")
+    private String pdfStorageDirectory;
 
-@SpringBootApplication
-public class PdfProcessorApplication {
+    @Value("${excel.report.directory}")
+    private String excelReportDirectory;
 
-    public static void main(String[] args) {
-        SpringApplication.run(PdfProcessorApplication.class, args);
+    public PDFService(PDFRepository pdfRepository) {
+        this.pdfRepository = pdfRepository;
+    }
+
+    public void processPDFs() throws Exception {
+        try (Stream<PDFProjection> pdfStream = pdfRepository.streamAll()) {
+            int fileIndex = 1;
+            int rowCount = 0;
+            final int MAX_ROWS_PER_FILE = 10_000;
+
+            Workbook workbook = new SXSSFWorkbook(); // Optimisé pour les gros fichiers Excel
+            Sheet sheet = workbook.createSheet("Rapport de traitement");
+            createHeader(sheet);
+
+            for (PDFProjection dto : (Iterable<PDFProjection>) pdfStream::iterator) {
+                try {
+                    Row row = sheet.createRow(rowCount++);
+                    row.createCell(0).setCellValue(dto.getId());
+                    row.createCell(1).setCellValue(savePdf(dto.getId(), dto.getZekPdf(), "ZEK"));
+                    row.createCell(2).setCellValue(savePdf(dto.getId(), dto.getFormulairesPdf(), "Formulaires_PDF"));
+                    row.createCell(3).setCellValue(savePdf(dto.getId(), dto.getRapportDecisionPdf(), "Rapport_decision"));
+
+                    if (rowCount >= MAX_ROWS_PER_FILE) {
+                        saveExcelFile(workbook, "Rapport_" + fileIndex++);
+                        workbook = new SXSSFWorkbook();
+                        sheet = workbook.createSheet("Rapport de traitement");
+                        createHeader(sheet);
+                        rowCount = 0;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Erreur lors du traitement de l'entité ID=" + dto.getId());
+                    e.printStackTrace();
+                }
+            }
+
+            // Sauvegarder le dernier fichier Excel
+            if (rowCount > 0) {
+                saveExcelFile(workbook, "Rapport_" + fileIndex++);
+            }
+
+            // Agréger les fichiers Excel en un seul fichier
+            aggregateExcelFiles(fileIndex - 1);
+
+            // Compresser tous les fichiers Excel (y compris l'agrégé)
+            compressGeneratedExcelFiles(fileIndex - 1);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors du traitement des PDFs.");
+        }
+    }
+
+    private void createHeader(Sheet sheet) {
+        Row headerRow = sheet.createRow(0);
+        headerRow.createCell(0).setCellValue("ID");
+        headerRow.createCell(1).setCellValue("ZEK_PDF");
+        headerRow.createCell(2).setCellValue("Formulaires_PDF");
+        headerRow.createCell(3).setCellValue("Rapport_decision_PDF");
+    }
+
+    private String savePdf(String id, String hexData, String directoryName) {
+        if (hexData == null || hexData.isEmpty()) {
+            return "KO";
+        }
+        try (FileOutputStream fos = new FileOutputStream(new File(new File(pdfStorageDirectory, directoryName), id + ".pdf"))) {
+            byte[] pdfData = DatatypeConverter.parseHexBinary(hexData);
+            fos.write(pdfData);
+            return "OK";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "KO";
+        }
+    }
+
+    private void saveExcelFile(Workbook workbook, String fileName) throws IOException {
+        String filePath = excelReportDirectory + "/" + fileName + ".xlsx";
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            workbook.write(fos);
+        }
+        ((SXSSFWorkbook) workbook).dispose();
+        System.out.println("Fichier Excel sauvegardé : " + filePath);
+    }
+
+    private void aggregateExcelFiles(int fileCount) throws IOException {
+        String aggregatedFilePath = excelReportDirectory + "/Rapport_agrégé.xlsx";
+        Workbook aggregatedWorkbook = new SXSSFWorkbook(); // Nouveau fichier Excel agrégé
+        Sheet aggregatedSheet = aggregatedWorkbook.createSheet("Rapport de traitement agrégé");
+        int rowCount = 0;
+
+        for (int i = 1; i <= fileCount; i++) {
+            String filePath = excelReportDirectory + "/Rapport_" + i + ".xlsx";
+            try (FileInputStream fis = new FileInputStream(filePath)) {
+                Workbook workbook = WorkbookFactory.create(fis);
+                Sheet sheet = workbook.getSheetAt(0);
+
+                for (int j = sheet.getFirstRowNum(); j <= sheet.getLastRowNum(); j++) {
+                    Row sourceRow = sheet.getRow(j);
+                    Row targetRow = aggregatedSheet.createRow(rowCount++);
+
+                    if (sourceRow != null) {
+                        for (int k = sourceRow.getFirstCellNum(); k < sourceRow.getLastCellNum(); k++) {
+                            Cell sourceCell = sourceRow.getCell(k);
+                            Cell targetCell = targetRow.createCell(k);
+
+                            if (sourceCell != null) {
+                                switch (sourceCell.getCellType()) {
+                                    case STRING:
+                                        targetCell.setCellValue(sourceCell.getStringCellValue());
+                                        break;
+                                    case NUMERIC:
+                                        targetCell.setCellValue(sourceCell.getNumericCellValue());
+                                        break;
+                                    case BOOLEAN:
+                                        targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                                        break;
+                                    case FORMULA:
+                                        targetCell.setCellFormula(sourceCell.getCellFormula());
+                                        break;
+                                    default:
+                                        targetCell.setCellValue(sourceCell.toString());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        try (FileOutputStream fos = new FileOutputStream(aggregatedFilePath)) {
+            aggregatedWorkbook.write(fos);
+        }
+        ((SXSSFWorkbook) aggregatedWorkbook).dispose();
+        System.out.println("Rapports agrégés dans : " + aggregatedFilePath);
+    }
+
+    private void compressGeneratedExcelFiles(int fileCount) throws IOException {
+        String zipPath = excelReportDirectory + "/Rapports_compressés.zip";
+        try (FileOutputStream fos = new FileOutputStream(zipPath);
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+            for (int i = 1; i <= fileCount; i++) {
+                String filePath = excelReportDirectory + "/Rapport_" + i + ".xlsx";
+                File fileToZip = new File(filePath);
+                try (FileInputStream fis = new FileInputStream(fileToZip)) {
+                    ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+                    zos.putNextEntry(zipEntry);
+
+                    byte[] buffer = new byte[1024];
+                    int length;
+                    while ((length = fis.read(buffer)) >= 0) {
+                        zos.write(buffer, 0, length);
+                    }
+                }
+                fileToZip.delete();
+            }
+
+            // Ajouter le fichier agrégé au ZIP
+            String aggregatedFilePath = excelReportDirectory + "/Rapport_agrégé.xlsx";
+            File aggregatedFile = new File(aggregatedFilePath);
+            try (FileInputStream fis = new FileInputStream(aggregatedFile)) {
+                ZipEntry zipEntry = new ZipEntry(aggregatedFile.getName());
+                zos.putNextEntry(zipEntry);
+
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = fis.read(buffer)) >= 0) {
+                    zos.write(buffer, 0, length);
+                }
+            }
+        }
+        System.out.println("Fichiers compressés dans : " + zipPath);
     }
 }
-
-
-
-public byte[] decodeHex(String hexData) {
-    if (hexData == null || hexData.isEmpty()) {
-        throw new IllegalArgumentException("La chaîne hexadécimale est vide ou nulle.");
-    }
-
-    // Retirer le préfixe 0x s'il est présent
-    if (hexData.startsWith("0x")) {
-        hexData = hexData.substring(2);
-    }
-
-    // Vérifier la longueur pour s'assurer qu'elle est paire
-    if (hexData.length() % 2 != 0) {
-        throw new IllegalArgumentException("La longueur de la chaîne hexadécimale est impaire et donc invalide : " + hexData);
-    }
-
-    // Décoder la chaîne hexadécimale en tableau d'octets
-    return DatatypeConverter.parseHexBinary(hexData);
-}
-
-Étape 3 : Déterminer si la Chaîne est UTF-8 ou un autre Format de Texte
-Si la chaîne contient des caractères ASCII au lieu de valeurs binaires, elle pourrait être du texte en UTF-8 ou un autre encodage de texte.
-
-Essayer de Convertir en Texte UTF-8 :
-
-public String convertToUtf8(String data) {
-    byte[] bytes = data.getBytes(StandardCharsets.UTF_8);
-    return new String(bytes, StandardCharsets.UTF_8);
-}
-
-
